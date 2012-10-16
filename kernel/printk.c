@@ -389,8 +389,10 @@ static ssize_t devkmsg_writev(struct kiocb *iocb, const struct iovec *iv,
 
 	line = buf;
 	for (i = 0; i < count; i++) {
-		if (copy_from_user(line, iv[i].iov_base, iv[i].iov_len))
+		if (copy_from_user(line, iv[i].iov_base, iv[i].iov_len)) {
+			ret = -EFAULT;
 			goto out;
+		}
 		line += iv[i].iov_len;
 	}
 
@@ -1032,6 +1034,7 @@ static int syslog_print_all(char __user *buf, int size, bool clear)
 			struct log *msg = log_from_idx(idx);
 
 			len += msg_print_text(msg, prev, true, NULL, 0);
+			prev = msg->flags;
 			idx = log_next(idx);
 			seq++;
 		}
@@ -1044,6 +1047,7 @@ static int syslog_print_all(char __user *buf, int size, bool clear)
 			struct log *msg = log_from_idx(idx);
 
 			len -= msg_print_text(msg, prev, true, NULL, 0);
+			prev = msg->flags;
 			idx = log_next(idx);
 			seq++;
 		}
@@ -1540,17 +1544,23 @@ asmlinkage int vprintk_emit(int facility, int level,
 		lflags |= LOG_NEWLINE;
 	}
 
-	/* strip syslog prefix and extract log level or control flags */
-	if (text[0] == '<' && text[1] && text[2] == '>') {
-		switch (text[1]) {
-		case '0' ... '7':
-			if (level == -1)
-				level = text[1] - '0';
-		case 'd':	/* KERN_DEFAULT */
-			lflags |= LOG_PREFIX;
-		case 'c':	/* KERN_CONT */
-			text += 3;
-			text_len -= 3;
+	/* strip kernel syslog prefix and extract log level or control flags */
+	if (facility == 0) {
+		int kern_level = printk_get_level(text);
+
+		if (kern_level) {
+			const char *end_of_header = printk_skip_level(text);
+			switch (kern_level) {
+			case '0' ... '7':
+				if (level == -1)
+					level = kern_level - '0';
+			case 'd':	/* KERN_DEFAULT */
+				lflags |= LOG_PREFIX;
+			case 'c':	/* KERN_CONT */
+				break;
+			}
+			text_len -= end_of_header - text;
+			text = (char *)end_of_header;
 		}
 	}
 

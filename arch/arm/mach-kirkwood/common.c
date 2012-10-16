@@ -17,6 +17,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/clk-provider.h>
 #include <linux/spinlock.h>
+#include <linux/mv643xx_i2c.h>
 #include <net/dsa.h>
 #include <asm/page.h>
 #include <asm/timex.h>
@@ -25,15 +26,15 @@
 #include <asm/mach/time.h>
 #include <mach/kirkwood.h>
 #include <mach/bridge-regs.h>
-#include <plat/audio.h>
+#include <linux/platform_data/asoc-kirkwood.h>
 #include <plat/cache-feroceon-l2.h>
-#include <plat/mvsdio.h>
-#include <plat/orion_nand.h>
-#include <plat/ehci-orion.h>
+#include <linux/platform_data/mmc-mvsdio.h>
+#include <linux/platform_data/mtd-orion_nand.h>
+#include <linux/platform_data/usb-ehci-orion.h>
 #include <plat/common.h>
 #include <plat/time.h>
 #include <plat/addr-map.h>
-#include <plat/mv_xor.h>
+#include <linux/platform_data/dma-mv_xor.h>
 #include "common.h"
 
 /*****************************************************************************
@@ -41,17 +42,7 @@
  ****************************************************************************/
 static struct map_desc kirkwood_io_desc[] __initdata = {
 	{
-		.virtual	= KIRKWOOD_PCIE_IO_VIRT_BASE,
-		.pfn		= __phys_to_pfn(KIRKWOOD_PCIE_IO_PHYS_BASE),
-		.length		= KIRKWOOD_PCIE_IO_SIZE,
-		.type		= MT_DEVICE,
-	}, {
-		.virtual	= KIRKWOOD_PCIE1_IO_VIRT_BASE,
-		.pfn		= __phys_to_pfn(KIRKWOOD_PCIE1_IO_PHYS_BASE),
-		.length		= KIRKWOOD_PCIE1_IO_SIZE,
-		.type		= MT_DEVICE,
-	}, {
-		.virtual	= KIRKWOOD_REGS_VIRT_BASE,
+		.virtual	= (unsigned long) KIRKWOOD_REGS_VIRT_BASE,
 		.pfn		= __phys_to_pfn(KIRKWOOD_REGS_PHYS_BASE),
 		.length		= KIRKWOOD_REGS_SIZE,
 		.type		= MT_DEVICE,
@@ -214,8 +205,7 @@ static struct clk *tclk;
 
 static struct clk __init *kirkwood_register_gate(const char *name, u8 bit_idx)
 {
-	return clk_register_gate(NULL, name, "tclk", 0,
-				 (void __iomem *)CLOCK_GATING_CTRL,
+	return clk_register_gate(NULL, name, "tclk", 0, CLOCK_GATING_CTRL,
 				 bit_idx, 0, &gating_lock);
 }
 
@@ -224,8 +214,7 @@ static struct clk __init *kirkwood_register_gate_fn(const char *name,
 						    void (*fn_en)(void),
 						    void (*fn_dis)(void))
 {
-	return clk_register_gate_fn(NULL, name, "tclk", 0,
-				    (void __iomem *)CLOCK_GATING_CTRL,
+	return clk_register_gate_fn(NULL, name, "tclk", 0, CLOCK_GATING_CTRL,
 				    bit_idx, 0, &gating_lock, fn_en, fn_dis);
 }
 
@@ -276,6 +265,7 @@ void __init kirkwood_clk_init(void)
 	orion_clkdev_add("0", "pcie", pex0);
 	orion_clkdev_add("1", "pcie", pex1);
 	orion_clkdev_add(NULL, "kirkwood-i2s", audio);
+	orion_clkdev_add(NULL, MV64XXX_I2C_CTLR_NAME ".0", runit);
 
 	/* Marvell says runit is used by SPI, UART, NAND, TWSI, ...,
 	 * so should never be gated.
@@ -299,7 +289,7 @@ void __init kirkwood_ge00_init(struct mv643xx_eth_platform_data *eth_data)
 {
 	orion_ge00_init(eth_data,
 			GE00_PHYS_BASE, IRQ_KIRKWOOD_GE00_SUM,
-			IRQ_KIRKWOOD_GE00_ERR);
+			IRQ_KIRKWOOD_GE00_ERR, 1600);
 	/* The interface forgets the MAC address assigned by u-boot if
 	the clock is turned off, so claim the clk now. */
 	clk_prepare_enable(ge0);
@@ -313,7 +303,7 @@ void __init kirkwood_ge01_init(struct mv643xx_eth_platform_data *eth_data)
 {
 	orion_ge01_init(eth_data,
 			GE01_PHYS_BASE, IRQ_KIRKWOOD_GE01_SUM,
-			IRQ_KIRKWOOD_GE01_ERR);
+			IRQ_KIRKWOOD_GE01_ERR, 1600);
 	clk_prepare_enable(ge1);
 }
 
@@ -515,6 +505,13 @@ void __init kirkwood_wdt_init(void)
 void __init kirkwood_init_early(void)
 {
 	orion_time_set_base(TIMER_VIRT_BASE);
+
+	/*
+	 * Some Kirkwood devices allocate their coherent buffers from atomic
+	 * context. Increase size of atomic coherent pool to make sure such
+	 * the allocations won't fail.
+	 */
+	init_dma_coherent_pool_size(SZ_1M);
 }
 
 int kirkwood_tclk;

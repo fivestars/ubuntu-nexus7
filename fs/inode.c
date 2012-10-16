@@ -348,7 +348,7 @@ void address_space_init_once(struct address_space *mapping)
 	mutex_init(&mapping->i_mmap_mutex);
 	INIT_LIST_HEAD(&mapping->private_list);
 	spin_lock_init(&mapping->private_lock);
-	INIT_RAW_PRIO_TREE_ROOT(&mapping->i_mmap);
+	mapping->i_mmap = RB_ROOT;
 	INIT_LIST_HEAD(&mapping->i_mmap_nonlinear);
 }
 EXPORT_SYMBOL(address_space_init_once);
@@ -1542,9 +1542,11 @@ void touch_atime(struct path *path)
 	if (timespec_equal(&inode->i_atime, &now))
 		return;
 
-	if (mnt_want_write(mnt))
+	if (!sb_start_write_trylock(inode->i_sb))
 		return;
 
+	if (__mnt_want_write(mnt))
+		goto skip_update;
 	/*
 	 * File systems can error out when updating inodes if they need to
 	 * allocate new space to modify an inode (such is the case for
@@ -1555,7 +1557,9 @@ void touch_atime(struct path *path)
 	 * of the fs read only, e.g. subvolumes in Btrfs.
 	 */
 	update_time(inode, &now, S_ATIME);
-	mnt_drop_write(mnt);
+	__mnt_drop_write(mnt);
+skip_update:
+	sb_end_write(inode->i_sb);
 }
 EXPORT_SYMBOL(touch_atime);
 
@@ -1662,11 +1666,11 @@ int file_update_time(struct file *file)
 		return 0;
 
 	/* Finally allowed to write? Takes lock. */
-	if (mnt_want_write_file(file))
+	if (__mnt_want_write_file(file))
 		return 0;
 
 	ret = update_time(inode, &now, sync_it);
-	mnt_drop_write_file(file);
+	__mnt_drop_write_file(file);
 
 	return ret;
 }

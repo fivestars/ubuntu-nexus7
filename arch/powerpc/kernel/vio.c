@@ -33,7 +33,6 @@
 #include <asm/prom.h>
 #include <asm/firmware.h>
 #include <asm/tce.h>
-#include <asm/abs_addr.h>
 #include <asm/page.h>
 #include <asm/hvcall.h>
 
@@ -611,6 +610,7 @@ static u64 vio_dma_get_required_mask(struct device *dev)
 struct dma_map_ops vio_dma_mapping_ops = {
 	.alloc             = vio_dma_iommu_alloc_coherent,
 	.free              = vio_dma_iommu_free_coherent,
+	.mmap		   = dma_direct_mmap_coherent,
 	.map_sg            = vio_dma_iommu_map_sg,
 	.unmap_sg          = vio_dma_iommu_unmap_sg,
 	.map_page          = vio_dma_iommu_map_page,

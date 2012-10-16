@@ -24,11 +24,7 @@
 
 static inline unsigned int get_irq_flags(struct resource *res)
 {
-	unsigned int flags = IRQF_SAMPLE_RANDOM | IRQF_SHARED;
-
-	flags |= res->flags & IRQF_TRIGGER_MASK;
-
-	return flags;
+	return IRQF_SHARED | (res->flags & IRQF_TRIGGER_MASK);
 }
 
 static struct device *dev;
@@ -134,13 +130,13 @@ static void update_charger(void)
 			regulator_set_current_limit(ac_draw, max_uA, max_uA);
 			if (!regulator_enabled) {
 				dev_dbg(dev, "charger on (AC)\n");
-				regulator_enable(ac_draw);
+				WARN_ON(regulator_enable(ac_draw));
 				regulator_enabled = 1;
 			}
 		} else {
 			if (regulator_enabled) {
 				dev_dbg(dev, "charger off\n");
-				regulator_disable(ac_draw);
+				WARN_ON(regulator_disable(ac_draw));
 				regulator_enabled = 0;
 			}
 		}
@@ -285,6 +281,12 @@ static int pda_power_probe(struct platform_device *pdev)
 			goto init_failed;
 	}
 
+	ac_draw = regulator_get(dev, "ac_draw");
+	if (IS_ERR(ac_draw)) {
+		dev_dbg(dev, "couldn't get ac_draw regulator\n");
+		ac_draw = NULL;
+	}
+
 	update_status();
 	update_charger();
 
@@ -311,13 +313,6 @@ static int pda_power_probe(struct platform_device *pdev)
 		pda_psy_ac.num_supplicants = pdata->num_supplicants;
 		pda_psy_usb.supplied_to = pdata->supplied_to;
 		pda_psy_usb.num_supplicants = pdata->num_supplicants;
-	}
-
-	ac_draw = regulator_get(dev, "ac_draw");
-	if (IS_ERR(ac_draw)) {
-		dev_dbg(dev, "couldn't get ac_draw regulator\n");
-		ac_draw = NULL;
-		ret = PTR_ERR(ac_draw);
 	}
 
 #ifdef CONFIG_USB_OTG_UTILS

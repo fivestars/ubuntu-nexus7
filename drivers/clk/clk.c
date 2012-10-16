@@ -465,6 +465,9 @@ static void __clk_disable(struct clk *clk)
 	if (!clk)
 		return;
 
+	if (WARN_ON(IS_ERR(clk)))
+		return;
+
 	if (WARN_ON(clk->enable_count == 0))
 		return;
 
@@ -553,25 +556,6 @@ int clk_enable(struct clk *clk)
 	return ret;
 }
 EXPORT_SYMBOL_GPL(clk_enable);
-
-/**
- * clk_get_rate - return the rate of clk
- * @clk: the clk whose rate is being returned
- *
- * Simply returns the cached rate of the clk.  Does not query the hardware.  If
- * clk is NULL then returns 0.
- */
-unsigned long clk_get_rate(struct clk *clk)
-{
-	unsigned long rate;
-
-	mutex_lock(&prepare_lock);
-	rate = __clk_get_rate(clk);
-	mutex_unlock(&prepare_lock);
-
-	return rate;
-}
-EXPORT_SYMBOL_GPL(clk_get_rate);
 
 /**
  * __clk_round_rate - round the given rate for a clk
@@ -697,6 +681,30 @@ static void __clk_recalc_rates(struct clk *clk, unsigned long msg)
 	hlist_for_each_entry(child, tmp, &clk->children, child_node)
 		__clk_recalc_rates(child, msg);
 }
+
+/**
+ * clk_get_rate - return the rate of clk
+ * @clk: the clk whose rate is being returned
+ *
+ * Simply returns the cached rate of the clk, unless CLK_GET_RATE_NOCACHE flag
+ * is set, which means a recalc_rate will be issued.
+ * If clk is NULL then returns 0.
+ */
+unsigned long clk_get_rate(struct clk *clk)
+{
+	unsigned long rate;
+
+	mutex_lock(&prepare_lock);
+
+	if (clk && (clk->flags & CLK_GET_RATE_NOCACHE))
+		__clk_recalc_rates(clk, 0);
+
+	rate = __clk_get_rate(clk);
+	mutex_unlock(&prepare_lock);
+
+	return rate;
+}
+EXPORT_SYMBOL_GPL(clk_get_rate);
 
 /**
  * __clk_speculate_rates
@@ -1578,6 +1586,20 @@ struct clk *of_clk_src_simple_get(struct of_phandle_args *clkspec,
 	return data;
 }
 EXPORT_SYMBOL_GPL(of_clk_src_simple_get);
+
+struct clk *of_clk_src_onecell_get(struct of_phandle_args *clkspec, void *data)
+{
+	struct clk_onecell_data *clk_data = data;
+	unsigned int idx = clkspec->args[0];
+
+	if (idx >= clk_data->clk_num) {
+		pr_err("%s: invalid clock index %d\n", __func__, idx);
+		return ERR_PTR(-EINVAL);
+	}
+
+	return clk_data->clks[idx];
+}
+EXPORT_SYMBOL_GPL(of_clk_src_onecell_get);
 
 /**
  * of_clk_add_provider() - Register a clock provider for a node

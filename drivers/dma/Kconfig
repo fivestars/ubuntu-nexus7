@@ -53,6 +53,7 @@ config AMBA_PL08X
 	bool "ARM PrimeCell PL080 or PL081 support"
 	depends on ARM_AMBA && EXPERIMENTAL
 	select DMA_ENGINE
+	select DMA_VIRTUAL_CHANNELS
 	help
 	  Platform has a PL08x DMAC device
 	  which can provide DMA engine support
@@ -207,6 +208,16 @@ config SIRF_DMA
 	help
 	  Enable support for the CSR SiRFprimaII DMA engine.
 
+config TI_EDMA
+	tristate "TI EDMA support"
+	depends on ARCH_DAVINCI
+	select DMA_ENGINE
+	select DMA_VIRTUAL_CHANNELS
+	default n
+	help
+	  Enable support for the TI EDMA controller. This DMA
+	  engine is found on TI DaVinci and AM33xx parts.
+
 config ARCH_HAS_ASYNC_TX_FIND_CHANNEL
 	bool
 
@@ -269,6 +280,7 @@ config DMA_SA11X0
 	tristate "SA-11x0 DMA support"
 	depends on ARCH_SA1100
 	select DMA_ENGINE
+	select DMA_VIRTUAL_CHANNELS
 	help
 	  Support the DMA engine found on Intel StrongARM SA-1100 and
 	  SA-1110 SoCs.  This DMA engine can only be used with on-chip
@@ -284,8 +296,24 @@ config MMP_TDMA
 
 	  Say Y here if you enabled MMP ADMA, otherwise say N.
 
+config DMA_OMAP
+	tristate "OMAP DMA support"
+	depends on ARCH_OMAP
+	select DMA_ENGINE
+	select DMA_VIRTUAL_CHANNELS
+
+config MMP_PDMA
+	bool "MMP PDMA support"
+	depends on (ARCH_MMP || ARCH_PXA)
+	select DMA_ENGINE
+	help
+	  Support the MMP PDMA engine for PXA and MMP platfrom.
+
 config DMA_ENGINE
 	bool
+
+config DMA_VIRTUAL_CHANNELS
+	tristate
 
 comment "DMA Clients"
 	depends on DMA_ENGINE

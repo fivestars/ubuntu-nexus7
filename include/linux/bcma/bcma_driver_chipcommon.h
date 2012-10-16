@@ -89,6 +89,12 @@
 #define  BCMA_CC_CHIPST_4313_OTP_PRESENT	2
 #define  BCMA_CC_CHIPST_4331_SPROM_PRESENT	2
 #define  BCMA_CC_CHIPST_4331_OTP_PRESENT	4
+#define  BCMA_CC_CHIPST_43228_ILP_DIV_EN	0x00000001
+#define  BCMA_CC_CHIPST_43228_OTP_PRESENT	0x00000002
+#define  BCMA_CC_CHIPST_43228_SERDES_REFCLK_PADSEL	0x00000004
+#define  BCMA_CC_CHIPST_43228_SDIO_MODE		0x00000008
+#define  BCMA_CC_CHIPST_43228_SDIO_OTP_PRESENT	0x00000010
+#define  BCMA_CC_CHIPST_43228_SDIO_RESET	0x00000020
 #define  BCMA_CC_CHIPST_4706_PKG_OPTION		BIT(0) /* 0: full-featured package 1: low-cost package */
 #define  BCMA_CC_CHIPST_4706_SFLASH_PRESENT	BIT(1) /* 0: parallel, 1: serial flash is present */
 #define  BCMA_CC_CHIPST_4706_SFLASH_TYPE	BIT(2) /* 0: 8b-p/ST-s flash, 1: 16b-p/Atmal-s flash */
@@ -509,6 +515,28 @@ struct bcma_pflash {
 	u32 window_size;
 };
 
+#ifdef CONFIG_BCMA_SFLASH
+struct bcma_sflash {
+	bool present;
+	u32 window;
+	u32 blocksize;
+	u16 numblocks;
+	u32 size;
+
+	struct mtd_info *mtd;
+};
+#endif
+
+#ifdef CONFIG_BCMA_NFLASH
+struct mtd_info;
+
+struct bcma_nflash {
+	bool present;
+
+	struct mtd_info *mtd;
+};
+#endif
+
 struct bcma_serial_port {
 	void *regs;
 	unsigned long clockspeed;
@@ -529,6 +557,12 @@ struct bcma_drv_cc {
 	struct bcma_chipcommon_pmu pmu;
 #ifdef CONFIG_BCMA_DRIVER_MIPS
 	struct bcma_pflash pflash;
+#ifdef CONFIG_BCMA_SFLASH
+	struct bcma_sflash sflash;
+#endif
+#ifdef CONFIG_BCMA_NFLASH
+	struct bcma_nflash nflash;
+#endif
 
 	int nr_serial_ports;
 	struct bcma_serial_port serial_ports[4];

@@ -29,6 +29,7 @@
 #include <linux/kdev_t.h>
 #include <linux/sched.h>
 #include <linux/time.h>
+#include <linux/err.h>
 #include <acpi/acpi_drivers.h>
 #include <acpi/acpi_bus.h>
 
@@ -927,6 +928,8 @@ static int acpi_power_meter_remove(struct acpi_device *device, int type)
 	return 0;
 }
 
+#ifdef CONFIG_PM_SLEEP
+
 static int acpi_power_meter_resume(struct device *dev)
 {
 	struct acpi_power_meter_resource *resource;
@@ -943,6 +946,8 @@ static int acpi_power_meter_resume(struct device *dev)
 
 	return 0;
 }
+
+#endif /* CONFIG_PM_SLEEP */
 
 static SIMPLE_DEV_PM_OPS(acpi_power_meter_pm, NULL, acpi_power_meter_resume);
 
